@@ -1,6 +1,7 @@
 package com.example.hardtracking
 
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -24,22 +25,26 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.hardtracking.ui.theme.HardTrackingTheme
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.UUID
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
@@ -56,8 +61,13 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun TimeLogApp() {
-    val events = remember { mutableStateListOf<TimeEvent>() }
+    val context = LocalContext.current
     var now by remember { mutableStateOf(Instant.now()) }
+    val events by TimeEventRepository.events.collectAsState(initial = emptyList())
+
+    LaunchedEffect(Unit) {
+        TimeEventRepository.init(context)
+    }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -70,13 +80,10 @@ fun TimeLogApp() {
         events = events,
         now = now,
         onStartEvent = {
-            events.add(TimeEvent(start = Instant.now()))
+            TimeEventRepository.addEvent(context)
         },
         onLabelChange = { id, label ->
-            val index = events.indexOfFirst { it.id == id }
-            if (index != -1) {
-                events[index] = events[index].copy(label = label)
-            }
+            TimeEventRepository.updateLabel(context, id, label)
         }
     )
 }
@@ -109,7 +116,22 @@ private fun TimeLogScreen(
     onLabelChange: (String, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var canDrawOverlay by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
+    var overlayEnabled by remember { mutableStateOf(OverlaySettings.isEnabled(context)) }
     val sortedEvents = events.sortedBy { it.start }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                canDrawOverlay = Settings.canDrawOverlays(context)
+                overlayEnabled = OverlaySettings.isEnabled(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -124,6 +146,61 @@ private fun TimeLogScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "잠금화면 플로팅 버튼",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "잠금 화면에서도 반투명 버튼으로 기록할 수 있습니다.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    when {
+                        !canDrawOverlay -> {
+                            Button(
+                                onClick = {
+                                    context.startActivity(
+                                        OverlaySettings.intentForPermission(context)
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(text = "권한 허용하고 버튼 띄우기")
+                            }
+                        }
+                        overlayEnabled -> {
+                            Button(
+                                onClick = {
+                                    context.stopService(
+                                        OverlayService.intent(context)
+                                    )
+                                    OverlaySettings.setEnabled(context, false)
+                                    overlayEnabled = false
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(text = "잠금화면 버튼 끄기")
+                            }
+                        }
+                        else -> {
+                            Button(
+                                onClick = {
+                                    context.startService(OverlayService.intent(context))
+                                    OverlaySettings.setEnabled(context, true)
+                                    overlayEnabled = true
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(text = "잠금화면 버튼 켜기")
+                            }
+                        }
+                    }
+                }
+            }
+
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
@@ -230,9 +307,3 @@ private fun formatDuration(start: Instant, end: Instant): String {
         "${minutes}분"
     }
 }
-
-private data class TimeEvent(
-    val id: String = UUID.randomUUID().toString(),
-    val start: Instant,
-    val label: String = ""
-)
