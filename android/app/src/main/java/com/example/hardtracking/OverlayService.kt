@@ -55,7 +55,7 @@ class OverlayService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun createOverlay() {
-        val size = dpToPx(OverlaySettings.loadSizeDp(this))
+        val size = dpToPx(48f)
         val (startX, startY) = OverlaySettings.loadPosition(this)
         layoutParams = WindowManager.LayoutParams(
             size,
