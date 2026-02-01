@@ -21,8 +21,8 @@ object TimeEventRepository {
         initialized = true
     }
 
-    fun addEvent(context: Context) {
-        val updated = eventsFlow.value + TimeEvent(start = Instant.now())
+    fun addEvent(context: Context, label: String = "") {
+        val updated = eventsFlow.value + TimeEvent(start = Instant.now(), label = label)
         eventsFlow.value = updated
         save(context, updated)
     }
