@@ -17,13 +17,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -140,6 +141,8 @@ private fun TimeLogScreen(
             if (event == Lifecycle.Event.ON_RESUME) {
                 canDrawOverlay = Settings.canDrawOverlays(context)
                 overlayEnabled = OverlaySettings.isEnabled(context)
+                overlaySize = OverlaySettings.loadSizeDp(context)
+                overlayAlpha = OverlaySettings.loadAlpha(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -331,6 +334,174 @@ private fun TimeLogScreen(
             }
         )
     }
+
+    if (showStartDialog) {
+        AlertDialog(
+            onDismissRequest = { showStartDialog = false },
+            title = { Text(text = "기록 시작") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(text = "지금 시작할 행동 이름을 입력하세요.")
+                    OutlinedTextField(
+                        value = startLabel,
+                        onValueChange = { startLabel = it },
+                        label = { Text(text = "행동 이름") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val trimmed = startLabel.trim()
+                        if (trimmed.isNotEmpty()) {
+                            onStartEvent(trimmed)
+                            showStartDialog = false
+                            startLabel = ""
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("기록을 시작했습니다")
+                            }
+                        }
+                    },
+                    enabled = startLabel.isNotBlank()
+                ) {
+                    Text(text = "시작")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showStartDialog = false }) {
+                    Text(text = "취소")
+                }
+            }
+        )
+    }
+
+    if (editingEvent != null) {
+        AlertDialog(
+            onDismissRequest = { editingEvent = null },
+            title = { Text(text = "행동 이름 수정") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(text = "잠금화면에서 시작한 기록이라면 여기서 이름을 입력하세요.")
+                    OutlinedTextField(
+                        value = editLabel,
+                        onValueChange = { editLabel = it },
+                        label = { Text(text = "행동 이름") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val event = editingEvent
+                        if (event != null) {
+                            onLabelChange(event.id, editLabel.trim())
+                        }
+                        editingEvent = null
+                    }
+                ) {
+                    Text(text = "저장")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingEvent = null }) {
+                    Text(text = "취소")
+                }
+            }
+        )
+    }
+
+    if (showOverlaySettings) {
+        AlertDialog(
+            onDismissRequest = { showOverlaySettings = false },
+            title = { Text(text = "잠금화면 플로팅 버튼 설정") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (!canDrawOverlay) {
+                        Text(text = "권한이 필요합니다.")
+                        Button(
+                            onClick = {
+                                context.startActivity(
+                                    OverlaySettings.intentForPermission(context)
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(text = "권한 허용")
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(text = "잠금화면 버튼 사용")
+                            Switch(
+                                checked = overlayEnabled,
+                                onCheckedChange = { enabled ->
+                                    if (enabled) {
+                                        context.startService(OverlayService.intent(context))
+                                    } else {
+                                        context.stopService(OverlayService.intent(context))
+                                    }
+                                    OverlaySettings.setEnabled(context, enabled)
+                                    overlayEnabled = enabled
+                                }
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(text = "크기: ${overlaySize.toInt()}dp")
+                        Slider(
+                            value = overlaySize,
+                            onValueChange = { overlaySize = it },
+                            valueRange = 36f..72f,
+                            steps = 6
+                        )
+                        Text(text = "투명도: ${(overlayAlpha * 100).toInt()}%")
+                        Slider(
+                            value = overlayAlpha,
+                            onValueChange = { overlayAlpha = it },
+                            valueRange = 0.4f..1.0f
+                        )
+                        TextButton(
+                            onClick = {
+                                OverlaySettings.resetPosition(context)
+                                if (overlayEnabled) {
+                                    context.stopService(OverlayService.intent(context))
+                                    context.startService(OverlayService.intent(context))
+                                }
+                            }
+                        ) {
+                            Text(text = "위치 초기화")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        OverlaySettings.saveSizeDp(context, overlaySize)
+                        OverlaySettings.saveAlpha(context, overlayAlpha)
+                        if (overlayEnabled) {
+                            context.stopService(OverlayService.intent(context))
+                            context.startService(OverlayService.intent(context))
+                        }
+                        showOverlaySettings = false
+                    }
+                ) {
+                    Text(text = "저장")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showOverlaySettings = false }) {
+                    Text(text = "닫기")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -364,7 +535,7 @@ private fun TimeEventCard(
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "지속 시간: ${formatDuration(event.start, end)}",
+                text = "${formatTimestamp(event.start)}-${formatTimestamp(end)} (${formatDurationMinutes(event.start, end)})",
                 style = MaterialTheme.typography.bodyMedium
             )
             Spacer(modifier = Modifier.height(12.dp))
@@ -400,14 +571,9 @@ private fun formatTimestamp(timestamp: Instant): String {
     return formatter.format(timestamp.atZone(ZoneId.systemDefault()))
 }
 
-private fun formatDuration(start: Instant, end: Instant): String {
+private fun formatDurationMinutes(start: Instant, end: Instant): String {
     val rawDuration = Duration.between(start, end)
     val duration = if (rawDuration.isNegative) Duration.ZERO else rawDuration
-    val hours = duration.toHours()
-    val minutes = duration.minusHours(hours).toMinutes()
-    return if (hours > 0) {
-        "${hours}시간 ${minutes}분"
-    } else {
-        "${minutes}분"
-    }
+    val minutes = duration.toMinutes()
+    return "${minutes}분"
 }

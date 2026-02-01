@@ -72,15 +72,15 @@ class OverlayService : Service() {
         }
 
         val button = TextView(this).apply {
-            text = "기록"
-            textSize = 14f
+            text = "▲"
+            textSize = 16f
             setTextColor(0xFFFFFFFF.toInt())
             gravity = Gravity.CENTER
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(0xAA1B5E20.toInt())
             }
-            alpha = 0.8f
+            alpha = OverlaySettings.loadAlpha(this@OverlayService)
         }
 
         val touchSlop = dpToPx(6f)
