@@ -53,7 +53,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -391,8 +390,11 @@ private fun TimeLogScreen(
                                 modifier = Modifier
                                     .size(overlaySize.dp)
                                     .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary)
-                                    .graphicsLayer(alpha = overlayAlpha)
+                                    .background(
+                                        MaterialTheme.colorScheme.primary.copy(
+                                            alpha = overlayAlpha
+                                        )
+                                    )
                             )
                         }
                         Spacer(modifier = Modifier.height(4.dp))
