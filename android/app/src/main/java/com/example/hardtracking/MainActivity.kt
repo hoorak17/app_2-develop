@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -135,6 +136,9 @@ private fun TimeLogScreen(
     var startLabel by remember { mutableStateOf("") }
     var editingEvent by remember { mutableStateOf<TimeEvent?>(null) }
     var editLabel by remember { mutableStateOf("") }
+    var showOverlaySettings by remember { mutableStateOf(false) }
+    var overlaySize by remember { mutableStateOf(OverlaySettings.loadSizeDp(context)) }
+    var overlayAlpha by remember { mutableStateOf(OverlaySettings.loadAlpha(context)) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
