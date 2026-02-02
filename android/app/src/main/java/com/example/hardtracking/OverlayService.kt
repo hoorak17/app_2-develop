@@ -1,6 +1,9 @@
 package com.example.hardtracking
 
 import android.app.KeyguardManager
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -16,6 +19,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.app.NotificationCompat
 import kotlin.math.abs
 
 class OverlayService : Service() {
@@ -30,6 +34,7 @@ class OverlayService : Service() {
         TimeEventRepository.init(this)
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        startForeground(FOREGROUND_ID, buildNotification())
         createOverlay()
         registerReceiver(screenReceiver, IntentFilter().apply {
             addAction(Intent.ACTION_USER_PRESENT)
@@ -55,7 +60,7 @@ class OverlayService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun createOverlay() {
-        val size = dpToPx(48f)
+        val size = dpToPx(OverlaySettings.loadSizeDp(this))
         val (startX, startY) = OverlaySettings.loadPosition(this)
         layoutParams = WindowManager.LayoutParams(
             size,
@@ -180,6 +185,28 @@ class OverlayService : Service() {
     }
 
     companion object {
+        private const val CHANNEL_ID = "overlay_service_channel"
+        private const val FOREGROUND_ID = 1001
+
         fun intent(context: Context): Intent = Intent(context, OverlayService::class.java)
+    }
+
+    private fun buildNotification(): Notification {
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "잠금화면 플로팅 버튼",
+                NotificationManager.IMPORTANCE_MIN
+            )
+            manager.createNotificationChannel(channel)
+        }
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle("잠금화면 기록 사용 중")
+            .setContentText("플로팅 버튼이 활성화되어 있습니다.")
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .build()
     }
 }
