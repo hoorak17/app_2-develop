@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.core.content.ContextCompat
 import com.example.hardtracking.ui.theme.HardTrackingTheme
 import java.time.Duration
 import java.time.Instant
@@ -161,6 +162,17 @@ private fun TimeLogScreen(
     var showClearConfirm by remember { mutableStateOf(false) }
     var overlaySize by remember { mutableStateOf(OverlaySettings.loadSizeDp(context)) }
     var overlayAlpha by remember { mutableStateOf(OverlaySettings.loadAlpha(context)) }
+    fun startOverlayService() {
+        ContextCompat.startForegroundService(context, OverlayService.intent(context))
+    }
+
+    val endMap = sortedEvents.mapIndexed { index, event ->
+        val end = sortedEvents.getOrNull(index + 1)?.start ?: now
+        event.id to end
+    }.toMap()
+    val filteredEvents = sortedEvents.filter { event ->
+        event.start.atZone(zoneId).toLocalDate() == selectedDate
+    }
 
     val endMap = sortedEvents.mapIndexed { index, event ->
         val end = sortedEvents.getOrNull(index + 1)?.start ?: now
@@ -370,7 +382,7 @@ private fun TimeLogScreen(
                                 checked = overlayEnabled,
                                 onCheckedChange = { enabled ->
                                     if (enabled) {
-                                        context.startService(OverlayService.intent(context))
+                                        startOverlayService()
                                     } else {
                                         context.stopService(OverlayService.intent(context))
                                     }
@@ -416,7 +428,7 @@ private fun TimeLogScreen(
                                 OverlaySettings.resetPosition(context)
                                 if (overlayEnabled) {
                                     context.stopService(OverlayService.intent(context))
-                                    context.startService(OverlayService.intent(context))
+                                    startOverlayService()
                                 }
                             }
                         ) {
@@ -436,7 +448,7 @@ private fun TimeLogScreen(
                         OverlaySettings.saveAlpha(context, overlayAlpha)
                         if (overlayEnabled) {
                             context.stopService(OverlayService.intent(context))
-                            context.startService(OverlayService.intent(context))
+                            startOverlayService()
                         }
                         showOverlaySettings = false
                     }
