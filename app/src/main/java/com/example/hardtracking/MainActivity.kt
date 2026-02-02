@@ -1,5 +1,6 @@
 package com.example.hardtracking
 
+import android.app.Application
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -37,9 +38,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hardtracking.ui.theme.HardTrackingTheme
 import java.time.Duration
 import java.time.Instant
@@ -61,13 +64,9 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun TimeLogApp() {
-    val context = LocalContext.current
+    val viewModel: TimeLogViewModel = viewModel()
     var now by remember { mutableStateOf(Instant.now()) }
-    val events by TimeEventRepository.events.collectAsState(initial = emptyList())
-
-    LaunchedEffect(Unit) {
-        TimeEventRepository.init(context)
-    }
+    val events by viewModel.events.collectAsState(initial = emptyList())
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -80,12 +79,28 @@ fun TimeLogApp() {
         events = events,
         now = now,
         onStartEvent = {
-            TimeEventRepository.addEvent(context)
+            viewModel.addEvent()
         },
         onLabelChange = { id, label ->
-            TimeEventRepository.updateLabel(context, id, label)
+            viewModel.updateLabel(id, label)
         }
     )
+}
+
+class TimeLogViewModel(application: Application) : AndroidViewModel(application) {
+    val events = TimeEventRepository.events
+
+    init {
+        TimeEventRepository.init(application)
+    }
+
+    fun addEvent() {
+        TimeEventRepository.addEvent(getApplication())
+    }
+
+    fun updateLabel(id: String, label: String) {
+        TimeEventRepository.updateLabel(getApplication(), id, label)
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
