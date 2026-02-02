@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,11 +17,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +51,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -187,34 +194,38 @@ private fun TimeLogScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "지금 하는 행동을 기록하세요",
-                style = MaterialTheme.typography.titleMedium
-            )
-            Text(
-                text = "입력 시점이 시작 시각이 되며, 이전 기록은 자동 종료됩니다.",
-                style = MaterialTheme.typography.bodyMedium
-            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "현재 시간",
-                    style = MaterialTheme.typography.titleSmall
-                )
                 TextButton(onClick = { showCalendarDialog = true }) {
-                    Text(text = formatDateTime(now, zoneId))
+                    Text(
+                        text = formatDateTime(now, zoneId),
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                }
+                IconButton(
+                    onClick = { showOverlaySettings = true },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Settings,
+                        contentDescription = "잠금화면 플로팅 버튼 설정",
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
                 }
             }
             Button(
                 onClick = { showStartDialog = true },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(text = "기록 시작")
+                Text(text = "기록하기")
             }
 
             Text(
@@ -247,142 +258,7 @@ private fun TimeLogScreen(
                 }
             }
 
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(
-                        text = "잠금화면 플로팅 버튼",
-                        style = MaterialTheme.typography.titleSmall
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TextButton(
-                        onClick = { showOverlaySettings = true },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(text = "설정 열기")
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    when {
-                        !canDrawOverlay -> {
-                            Button(
-                                onClick = {
-                                    context.startActivity(
-                                        OverlaySettings.intentForPermission(context)
-                                    )
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(text = "권한 허용")
-                            }
-                        }
-                        overlayEnabled -> {
-                            Button(
-                                onClick = {
-                                    context.stopService(
-                                        OverlayService.intent(context)
-                                    )
-                                    OverlaySettings.setEnabled(context, false)
-                                    overlayEnabled = false
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(text = "잠금화면 버튼 끄기")
-                            }
-                        }
-                        else -> {
-                            Button(
-                                onClick = {
-                                    context.startService(OverlayService.intent(context))
-                                    OverlaySettings.setEnabled(context, true)
-                                    overlayEnabled = true
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(text = "잠금화면 버튼 켜기")
-                            }
-                        }
-                    }
-                }
-            }
         }
-    }
-
-    if (showStartDialog) {
-        AlertDialog(
-            onDismissRequest = { showStartDialog = false },
-            title = { Text(text = "기록 시작") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(text = "지금 시작할 행동 이름을 입력하세요.")
-                    OutlinedTextField(
-                        value = startLabel,
-                        onValueChange = { startLabel = it },
-                        label = { Text(text = "행동 이름") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val trimmed = startLabel.trim()
-                        if (trimmed.isNotEmpty()) {
-                            onStartEvent(trimmed)
-                            showStartDialog = false
-                            startLabel = ""
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar("기록을 시작했습니다")
-                            }
-                        }
-                    },
-                    enabled = startLabel.isNotBlank()
-                ) {
-                    Text(text = "시작")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showStartDialog = false }) {
-                    Text(text = "취소")
-                }
-            }
-        )
-    }
-
-    if (editingEvent != null) {
-        AlertDialog(
-            onDismissRequest = { editingEvent = null },
-            title = { Text(text = "행동 이름 수정") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(text = "잠금화면에서 시작한 기록이라면 여기서 이름을 입력하세요.")
-                    OutlinedTextField(
-                        value = editLabel,
-                        onValueChange = { editLabel = it },
-                        label = { Text(text = "행동 이름") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val event = editingEvent
-                        if (event != null) {
-                            onLabelChange(event.id, editLabel.trim())
-                        }
-                        editingEvent = null
-                    }
-                ) {
-                    Text(text = "저장")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { editingEvent = null }) {
-                    Text(text = "취소")
-                }
-            }
-        )
     }
 
     if (showStartDialog) {
@@ -678,12 +554,12 @@ private fun formatTimestamp(timestamp: Instant): String {
 }
 
 private fun formatDate(date: LocalDate): String {
-    val formatter = DateTimeFormatter.ofPattern("yyyy.MM.dd")
+    val formatter = DateTimeFormatter.ofPattern("MM월 dd일")
     return formatter.format(date)
 }
 
 private fun formatDateTime(timestamp: Instant, zoneId: ZoneId): String {
-    val formatter = DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm")
+    val formatter = DateTimeFormatter.ofPattern("MM월 dd일 HH:mm")
     return formatter.format(timestamp.atZone(zoneId))
 }
 
