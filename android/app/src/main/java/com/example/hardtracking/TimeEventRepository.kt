@@ -39,6 +39,11 @@ object TimeEventRepository {
         save(context, updated)
     }
 
+    fun clearAll(context: Context) {
+        eventsFlow.value = emptyList()
+        save(context, emptyList())
+    }
+
     private fun load(context: Context): List<TimeEvent> {
         val raw = prefs(context).getString(KEY_EVENTS, "[]") ?: "[]"
         val array = JSONArray(raw)
